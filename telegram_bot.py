@@ -269,8 +269,15 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df_filter = df[df["Ngày đưa đơn"].dt.date >= monday]
             ten_ky = f"tuan nay tu {monday.strftime('%d/%m')}"
         else:
-            df_filter = df
-            ten_ky = "tat ca"
+            # Thu parse ngay cu the: /tonghop 29/5
+            try:
+                year = now.year
+                d = datetime.strptime(f"{args[0]}/{year}", "%d/%m/%Y").date()
+                df_filter = df[df["Ngày đưa đơn"].dt.date == d]
+                ten_ky = f"ngay {d.strftime('%d/%m/%Y')}"
+            except ValueError:
+                df_filter = df
+                ten_ky = "tat ca"
 
         if df_filter.empty:
             await msg.reply_text(f"Khong co du lieu {ten_ky}.")
