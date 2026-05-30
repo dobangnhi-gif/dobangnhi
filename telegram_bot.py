@@ -8,17 +8,47 @@ from tao_bao_cao_doanhthu import tong_hop_doanh_thu
 from doc_file_don_le import doc_file_don_le, them_vao_tong_hop
 import pandas as pd
 
+# Import Google Drive neu co credentials
+try:
+    from google_drive import upload_file, download_file, list_files_on_drive
+    USE_DRIVE = bool(os.environ.get("GOOGLE_CREDENTIALS"))
+except Exception:
+    USE_DRIVE = False
+
 BOT_TOKEN = "8816246373:AAFNJr6KWKxXWgQwBYQu5nFqGOl574m-q-c"
 CHAT_ID = None
 DOWNLOAD_DIR = "downloads"
-MASTER_FILE = os.path.join(DOWNLOAD_DIR, "tong_hop_san_luong.xlsx")
+MASTER_FILENAME = "tong_hop_san_luong.xlsx"
+MASTER_FILE = os.path.join(DOWNLOAD_DIR, MASTER_FILENAME)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
+def sync_master_from_drive():
+    """Tai master file tu Drive ve local neu co."""
+    if not USE_DRIVE:
+        return
+    try:
+        download_file(MASTER_FILENAME, MASTER_FILE)
+        logging.info("Synced master file from Drive")
+    except Exception as e:
+        logging.warning(f"Khong the tai master file tu Drive: {e}")
+
+
+def sync_master_to_drive():
+    """Upload master file len Drive."""
+    if not USE_DRIVE:
+        return
+    try:
+        if os.path.exists(MASTER_FILE):
+            upload_file(MASTER_FILE, MASTER_FILENAME)
+            logging.info("Synced master file to Drive")
+    except Exception as e:
+        logging.warning(f"Khong the upload master file len Drive: {e}")
+
+
 def la_file_don_le(filename):
-    """Kiem tra xem file co phai file don hang le khong (ten bat dau bang 'in ')."""
     name = filename.lower().strip()
     return name.startswith("in ") or name.startswith("in_")
 
@@ -41,14 +71,24 @@ async def luu_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await file.download_to_drive(input_path)
         logging.info(f"Da luu: {save_name}")
 
-        # Neu la file don hang le thi tu dong tong hop vao master file
+        # Upload file goc len Drive
+        if USE_DRIVE:
+            try:
+                upload_file(input_path, save_name)
+            except Exception as e:
+                logging.warning(f"Khong upload duoc file goc: {e}")
+
         if la_file_don_le(filename):
+            # Tai master file tu Drive truoc
+            sync_master_from_drive()
             ten_sale = msg.from_user.full_name if msg.from_user else ""
             du_lieu, ten_kh = doc_file_don_le(input_path, ten_sale)
             tong = them_vao_tong_hop(du_lieu, MASTER_FILE)
+            # Upload master file len Drive
+            sync_master_to_drive()
             await msg.reply_text(
                 f"Da luu va tong hop: {filename}\n"
-                f"Khach: {ten_kh} | {len(du_lieu)} dong | Tong hop: {tong} dong"
+                f"Khach: {ten_kh} | {len(du_lieu)} dong | Tong: {tong} dong"
             )
         else:
             await msg.reply_text(f"Da luu file: {filename}")
@@ -92,7 +132,6 @@ def tinh_khoang_ngay(args):
 
 
 async def tao_bao_cao_tuan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lenh /baocao - tong hop bao cao san luong."""
     msg = update.message
     if CHAT_ID and msg.chat_id != CHAT_ID:
         return
@@ -101,15 +140,17 @@ async def tao_bao_cao_tuan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if tu_ngay is None:
         await msg.reply_text(
             "Cu phap:\n"
-            "/baocao - bao cao san luong tuan truoc\n"
-            "/baocao thang - bao cao thang truoc\n"
-            "/baocao 18/5 24/5 - bao cao khoang ngay cu the"
+            "/baocao - tuan truoc\n"
+            "/baocao thang - thang truoc\n"
+            "/baocao 18/5 24/5 - khoang ngay cu the"
         )
         return
 
     await msg.reply_text(f"Dang tong hop san luong: {ten_ky}...")
 
-    # Uu tien doc tu master file tong hop
+    # Tai master file tu Drive
+    sync_master_from_drive()
+
     if os.path.exists(MASTER_FILE):
         try:
             df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
@@ -130,55 +171,12 @@ async def tao_bao_cao_tuan(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         )
                     return
         except Exception as e:
-            logging.warning(f"Khong doc duoc master file: {e}")
+            logging.warning(f"Loi doc master file: {e}")
 
-    # Fallback: doc tu cac file rieng le
-    files = []
-    for f in os.listdir(DOWNLOAD_DIR):
-        if f.endswith(".xlsx") or f.endswith(".xls"):
-            if f.startswith("temp_") or f.startswith("BaoCao") or f.startswith("DoanhThu") or f == "tong_hop_san_luong.xlsx":
-                continue
-            fpath = os.path.join(DOWNLOAD_DIR, f)
-            mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
-            if tu_ngay <= mtime <= den_ngay:
-                files.append(fpath)
-
-    if not files:
-        await msg.reply_text(f"Khong tim thay du lieu trong: {ten_ky}")
-        return
-
-    dfs = []
-    for f in files:
-        try:
-            df = doc_du_lieu(f)
-            dfs.append(df)
-        except Exception as e:
-            logging.warning(f"Bo qua {f}: {e}")
-
-    if not dfs:
-        await msg.reply_text("Khong doc duoc du lieu.")
-        return
-
-    try:
-        df_all = pd.concat(dfs, ignore_index=True)
-        tmp = os.path.join(DOWNLOAD_DIR, "temp_combined.xlsx")
-        df_all.to_excel(tmp, index=False, sheet_name="Tổng hợp sản lượng")
-        ten_file = ten_ky.replace("/", "-").replace(" ", "_")
-        output_path = os.path.join(DOWNLOAD_DIR, f"BaoCao_{ten_file}.xlsx")
-        tao_bao_cao(tmp, output_path)
-        with open(output_path, "rb") as f:
-            await msg.reply_document(
-                document=f,
-                filename=os.path.basename(output_path),
-                caption=f"Bao cao san luong {ten_ky} ({len(files)} file)"
-            )
-    except Exception as e:
-        logging.error(f"Loi tao bao cao: {e}")
-        await msg.reply_text(f"Loi: {str(e)}")
+    await msg.reply_text(f"Khong tim thay du lieu trong: {ten_ky}")
 
 
 async def tao_bao_cao_doanh_thu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lenh /doanhthu - tong hop bao cao doanh thu."""
     msg = update.message
     if CHAT_ID and msg.chat_id != CHAT_ID:
         return
@@ -186,8 +184,8 @@ async def tao_bao_cao_doanh_thu(update: Update, context: ContextTypes.DEFAULT_TY
     if not args:
         await msg.reply_text(
             "Cu phap:\n"
-            "/doanhthu 5 - bao cao doanh thu thang 5\n"
-            "/doanhthu 4 2026 - bao cao doanh thu thang 4/2026"
+            "/doanhthu 5 - thang 5\n"
+            "/doanhthu 4 2026 - thang 4/2026"
         )
         return
     try:
@@ -207,19 +205,39 @@ async def tao_bao_cao_doanh_thu(update: Update, context: ContextTypes.DEFAULT_TY
         den_ngay = datetime(nam, thang + 1, 1) - timedelta(seconds=1)
     ten_thang = f"Thang {thang}/{nam}"
 
+    # Tim file local
     files = []
     for f in os.listdir(DOWNLOAD_DIR):
         if not (f.endswith(".xlsx") or f.endswith(".xls")):
             continue
-        if f.startswith("temp_") or f.startswith("BaoCao") or f.startswith("DoanhThu") or f == "tong_hop_san_luong.xlsx":
+        if f.startswith("temp_") or f.startswith("BaoCao") or f.startswith("DoanhThu") or f == MASTER_FILENAME:
             continue
         fpath = os.path.join(DOWNLOAD_DIR, f)
         mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
         if tu_ngay <= mtime <= den_ngay:
             files.append(fpath)
 
+    # Neu khong co local, tim tren Drive
+    if not files and USE_DRIVE:
+        await msg.reply_text("Dang tim file tren Google Drive...")
+        try:
+            drive_files = list_files_on_drive()
+            for df_info in drive_files:
+                fname = df_info["name"]
+                if not (fname.endswith(".xlsx") or fname.endswith(".xls")):
+                    continue
+                if fname.startswith("temp_") or fname.startswith("BaoCao") or fname.startswith("DoanhThu") or fname == MASTER_FILENAME:
+                    continue
+                mod_time = datetime.fromisoformat(df_info["modifiedTime"].replace("Z", "+00:00")).replace(tzinfo=None)
+                if tu_ngay <= mod_time <= den_ngay:
+                    local_path = os.path.join(DOWNLOAD_DIR, fname)
+                    download_file(fname, local_path)
+                    files.append(local_path)
+        except Exception as e:
+            logging.warning(f"Loi tim file tren Drive: {e}")
+
     if not files:
-        await msg.reply_text(f"Khong tim thay file Excel nao trong {ten_thang}.")
+        await msg.reply_text(f"Khong tim thay file nao trong {ten_thang}.")
         return
 
     await msg.reply_text(f"Dang tong hop doanh thu {ten_thang} ({len(files)} file)...")
@@ -238,13 +256,15 @@ async def tao_bao_cao_doanh_thu(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lenh /tonghop - xem du lieu tong hop san luong hien tai."""
     msg = update.message
     if CHAT_ID and msg.chat_id != CHAT_ID:
         return
 
     args = context.args or []
     now = datetime.now()
+
+    # Tai master file tu Drive
+    sync_master_from_drive()
 
     if not os.path.exists(MASTER_FILE):
         await msg.reply_text("Chua co du lieu tong hop. Hay gui file don hang vao nhom truoc.")
@@ -254,7 +274,6 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
         df["Ngày đưa đơn"] = pd.to_datetime(df["Ngày đưa đơn"], errors="coerce")
 
-        # Mac dinh: hom nay
         if not args:
             ngay = now.date()
             df_filter = df[df["Ngày đưa đơn"].dt.date == ngay]
@@ -269,7 +288,6 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df_filter = df[df["Ngày đưa đơn"].dt.date >= monday]
             ten_ky = f"tuan nay tu {monday.strftime('%d/%m')}"
         else:
-            # Thu parse ngay cu the: /tonghop 29/5
             try:
                 year = now.year
                 d = datetime.strptime(f"{args[0]}/{year}", "%d/%m/%Y").date()
@@ -283,7 +301,6 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(f"Khong co du lieu {ten_ky}.")
             return
 
-        # Tao file bao cao tu du lieu da loc
         tmp = os.path.join(DOWNLOAD_DIR, "temp_tonghop.xlsx")
         df_filter.to_excel(tmp, sheet_name="Tổng hợp sản lượng", index=False)
         output_path = os.path.join(DOWNLOAD_DIR, f"TongHop_{now.strftime('%d%m%Y')}.xlsx")
@@ -301,21 +318,18 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+    if USE_DRIVE:
+        print("Google Drive: ON")
+        sync_master_from_drive()
+    else:
+        print("Google Drive: OFF (khong co GOOGLE_CREDENTIALS)")
+
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.Document.ALL, luu_file))
     app.add_handler(CommandHandler("baocao", tao_bao_cao_tuan))
     app.add_handler(CommandHandler("doanhthu", tao_bao_cao_doanh_thu))
     app.add_handler(CommandHandler("tonghop", xem_tonghop))
     print("Bot dang chay...")
-    print("=== SAN LUONG ===")
-    print("Gui file 'in xxx.xlsx' -> tu dong tong hop")
-    print("/tonghop - xem tong hop hom nay")
-    print("/tonghop tuan - xem tong hop tuan nay")
-    print("/baocao - bao cao tuan truoc")
-    print("/baocao thang - bao cao thang truoc")
-    print("/baocao 18/5 24/5 - khoang ngay cu the")
-    print("=== DOANH THU ===")
-    print("/doanhthu 4 - bao cao doanh thu thang 4")
     app.run_polling()
 
 
