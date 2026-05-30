@@ -333,3 +333,21 @@ if __name__ == "__main__":
         print("Cach dung: python tao_bao_cao_doanhthu.py file1.xlsx [file2.xlsx ...] output.xlsx")
         sys.exit(1)
     tong_hop_doanh_thu(sys.argv[1:-1], sys.argv[-1])
+
+
+def them_vao_doanh_thu(dong_moi, master_file):
+    """Them 1 dong vao master file doanh thu."""
+    import pandas as pd
+    cols = ["Tên khách ", "In đơn", "INV Date", "Ngày gửi đơn", "Amount", "Số Bit ", "Sale"]
+    if os.path.exists(master_file):
+        try:
+            df_cu = pd.read_excel(master_file, sheet_name="Quản lý")
+        except Exception:
+            df_cu = pd.DataFrame(columns=cols)
+    else:
+        df_cu = pd.DataFrame(columns=cols)
+    df_moi = pd.DataFrame([dong_moi])
+    df_all = pd.concat([df_cu, df_moi], ignore_index=True)
+    with pd.ExcelWriter(master_file, engine="openpyxl") as writer:
+        df_all.to_excel(writer, sheet_name="Quản lý", index=False)
+    return len(df_all)
