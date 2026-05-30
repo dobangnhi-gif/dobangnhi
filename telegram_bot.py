@@ -266,6 +266,17 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
             monday = today - timedelta(days=today.weekday())
             df_filter = df[df["Ngày đưa đơn"].dt.date >= monday]
             ten_ky = f"tuan nay tu {monday.strftime('%d/%m')}"
+        elif len(args) >= 2:
+            # /tonghop 1/6 7/6 - khoang ngay bat ki
+            try:
+                year = now.year
+                d1 = datetime.strptime(f"{args[0]}/{year}", "%d/%m/%Y").date()
+                d2 = datetime.strptime(f"{args[1]}/{year}", "%d/%m/%Y").date()
+                df_filter = df[(df["Ngày đưa đơn"].dt.date >= d1) & (df["Ngày đưa đơn"].dt.date <= d2)]
+                ten_ky = f"{d1.strftime('%d/%m')} - {d2.strftime('%d/%m/%Y')}"
+            except ValueError:
+                df_filter = df
+                ten_ky = "tat ca"
         else:
             try:
                 year = now.year
