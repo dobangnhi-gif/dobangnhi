@@ -357,7 +357,7 @@ def main():
     app.add_handler(CommandHandler("doanhthu", tao_bao_cao_doanh_thu))
     app.add_handler(CommandHandler("tonghop", xem_tonghop))
     print("Bot dang chay...")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
