@@ -235,10 +235,24 @@ async def tao_bao_cao_doanh_thu(update: Update, context: ContextTypes.DEFAULT_TY
         if df_filter.empty:
             await msg.reply_text(f"Khong co du lieu doanh thu {ten_thang}.")
             return
-        tmp = os.path.join(DOWNLOAD_DIR, "temp_dt.xlsx")
-        df_filter.to_excel(tmp, sheet_name="Quản lý", index=False)
         output_path = os.path.join(DOWNLOAD_DIR, f"DoanhThu_Thang{thang:02d}_{nam}.xlsx")
-        tong_hop_doanh_thu([tmp], output_path, thang=f"{thang}/{nam}")
+        import openpyxl as _opx
+        from tao_bao_cao_doanhthu import viet_sheet_quan_ly, viet_sheet_cong_no, viet_sheet_dthu
+        wb = _opx.Workbook()
+        wb.remove(wb.active)
+        col_ten = "Tên khách "
+        col_amount = "Amount"
+        col_sale = "Sale"
+        col_indon = "In đơn"
+        col_inv = "INV Date"
+        col_ngay = "Ngày gửi đơn"
+        col_bit = "Số Bit "
+        viet_sheet_quan_ly(wb, df_filter, col_ten, col_amount, col_sale, col_indon, col_inv, col_ngay, col_bit)
+        if col_ten in df_filter.columns and col_amount in df_filter.columns:
+            viet_sheet_cong_no(wb, df_filter, col_ten, col_amount)
+        if col_sale in df_filter.columns and col_amount in df_filter.columns:
+            viet_sheet_dthu(wb, df_filter, col_sale, col_amount)
+        wb.save(output_path)
         with open(output_path, "rb") as f:
             await msg.reply_document(
                 document=f,

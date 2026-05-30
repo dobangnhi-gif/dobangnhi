@@ -40,29 +40,28 @@ def _parse_date_str(s):
 
 
 def doc_file_don_le_doanhthu(filepath, ten_sale=None):
-    """
-    Doc file don hang le (2 format):
-    - Format 1 (Vera): dong 'tong' o cuoi, amount o cot cuoi
-    - Format 2 (Eple): label 'Amount' o hang 1-2, gia tri o hang tiep theo
-    Tra ve 1 dict dai dien 1 dong trong bao cao doanh thu.
-    """
+    """Doc file don hang le de lay thong tin doanh thu."""
+    from doc_file_don_le import tim_ten_khach, tim_header_row, tim_ngay, parse_ngay
+    import re
+
     wb = openpyxl.load_workbook(filepath, data_only=True)
     ws = wb.active
-    rows = [r for r in ws.iter_rows(values_only=True) if any(v is not None for v in r)]
+    all_rows = list(ws.iter_rows(values_only=True))
+    rows = [r for r in all_rows if any(v is not None for v in r)]
     if len(rows) < 2:
         raise ValueError("File qua ngan")
 
-    keywords = ["inv", "start", "amount", "date", "ngay", "don", "đơn", "number",
-                "type", "level", "qty", "length", "quality", "color", "pattern", "mau", "màu", "gia", "giá"]
+    header_idx = tim_header_row(rows) or 3
 
-    ten_kh = None
-    ngay_in_don = None
-    inv_date = None
+    # Tim ten khach dung ham chung
+    ten_kh = tim_ten_khach(rows, header_idx)
+
+    # Tim ngay
+    ngay_in_don, inv_date = tim_ngay(rows, header_idx)
+
+    # Tim Amount: label "Amount" -> gia tri hang tiep theo
     amount = None
-
-    # --- Tim Amount ---
-    # Format 2: label "Amount" trong hang 0-3, gia tri o hang tiep theo
-    for i, row in enumerate(rows[:4]):
+    for i, row in enumerate(rows[:header_idx]):
         for j, v in enumerate(row):
             if v and str(v).strip().lower() == "amount":
                 if i + 1 < len(rows) and j < len(rows[i+1]):
@@ -76,12 +75,11 @@ def doc_file_don_le_doanhthu(filepath, ten_sale=None):
         if amount is not None:
             break
 
-    # Format 1: dong "tong" o cuoi, amount o cot cuoi
+    # Format Vera: dong tong o cuoi
     if amount is None:
         for row in reversed(rows):
             for v in row:
-                if v and str(v).lower().strip() in ["tong", "tổng", "total"]:
-                    # Lay gia tri so cuoi cung trong dong nay
+                if v and str(v).strip().lower().replace("\u1ed5", "o").replace("\u00f4", "o") in ["tong", "total", "t\u1ed5ng"]:
                     for val in reversed(row):
                         if val is not None:
                             try:
@@ -92,31 +90,6 @@ def doc_file_don_le_doanhthu(filepath, ten_sale=None):
                     break
             if amount is not None:
                 break
-
-    # --- Tim ten khach ---
-    for row in rows[:4]:
-        for v in row:
-            if v and str(v).strip():
-                s = str(v).strip()
-                sl = s.lower().replace(" ", "")
-                is_kw = any(k.replace(" ", "") in sl for k in keywords)
-                is_num = s.replace("-", "").replace(".", "").replace("/", "").isdigit()
-                if not is_kw and not is_num and len(s) > 2:
-                    ten_kh = s
-                    break
-        if ten_kh:
-            break
-
-    # --- Tim ngay ---
-    for row in rows[:3]:
-        for v in row:
-            d = _parse_date_str(v)
-            if d:
-                if ngay_in_don is None:
-                    ngay_in_don = d
-                elif inv_date is None and d != ngay_in_don:
-                    inv_date = d
-                    break
 
     return {
         "Tên khách ": ten_kh,
