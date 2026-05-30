@@ -189,9 +189,16 @@ def doc_file_don_le(filepath, ten_sale=None):
         else:
             product = phan_loai_product(level)
 
+        # Loai mau
+        color_str = str(color).lower() if color else ""
+        loai_mau = "No Color" if "natural" in color_str else "Color"
+
+        # Code 2 = Code1 + Number
+        code2 = f"{code1}{number}" if code1 else str(number)
+
         dong = {
             "Ngày đưa đơn": ngay_in_don,
-            "Code 1": code1,
+            "Code 1 ": code1,
             "Product": product,
             "Number": number,
             "Level": level,
@@ -201,8 +208,9 @@ def doc_file_don_le(filepath, ten_sale=None):
             "Quality": quality,
             "Color": color,
             "Column1": pattern,
-            "INV Date": inv_date,
-            "Sale": ten_sale or "",
+            "Loại màu": loai_mau,
+            "Sale ": ten_sale or "",
+            "Code 2": code2,
         }
         ket_qua.append(dong)
 
@@ -210,8 +218,8 @@ def doc_file_don_le(filepath, ten_sale=None):
 
 
 def them_vao_tong_hop(du_lieu_moi, master_file):
-    cols = ["Ngày đưa đơn", "Code 1", "Product", "Number", "Level",
-            "Qty", "Lenght", "Full Level", "Quality", "Color", "Column1", "INV Date", "Sale"]
+    cols = ["Ngày đưa đơn", "Code 1 ", "Product", "Number", "Level",
+            "Qty", "Lenght", "Full Level", "Quality", "Color", "Column1", "Loại màu", "Sale ", "Code 2"]
 
     if os.path.exists(master_file):
         try:
