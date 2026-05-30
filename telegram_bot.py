@@ -269,8 +269,9 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
     now = datetime.now()
 
-    # Tai master file tu Drive
-    sync_master_from_drive()
+    # Chi tai tu Drive neu file local khong ton tai
+    if not os.path.exists(MASTER_FILE):
+        sync_master_from_drive()
 
     if not os.path.exists(MASTER_FILE):
         await msg.reply_text("Chua co du lieu tong hop. Hay gui file don hang vao nhom truoc.")
