@@ -1,3 +1,5 @@
 python-telegram-bot==22.7
 openpyxl
 pandas
+google-auth
+google-api-python-client
