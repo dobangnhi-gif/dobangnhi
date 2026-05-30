@@ -253,11 +253,12 @@ async def tao_bao_cao_doanh_thu(update: Update, context: ContextTypes.DEFAULT_TY
         if col_sale in df_filter.columns and col_amount in df_filter.columns:
             viet_sheet_dthu(wb, df_filter, col_sale, col_amount)
         wb.save(output_path)
+        tong_amount = df_filter["Amount"].sum() if "Amount" in df_filter.columns else 0
         with open(output_path, "rb") as f:
             await msg.reply_document(
                 document=f,
                 filename=os.path.basename(output_path),
-                caption=f"Bao cao doanh thu {ten_thang} ({len(df_filter)} don)"
+                caption=f"Bao cao doanh thu {ten_thang}\nSo don: {len(df_filter)} | Tong amount: {tong_amount:,.0f}"
             )
     except Exception as e:
         logging.error(f"Loi tao bao cao doanh thu: {e}")
