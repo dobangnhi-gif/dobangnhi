@@ -148,8 +148,9 @@ async def tao_bao_cao_tuan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(f"Dang tong hop san luong: {ten_ky}...")
 
-    # Tai master file tu Drive
-    sync_master_from_drive()
+    # Chi tai tu Drive neu file local khong ton tai
+    if not os.path.exists(MASTER_FILE):
+        sync_master_from_drive()
 
     if os.path.exists(MASTER_FILE):
         try:
