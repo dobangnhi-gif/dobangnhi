@@ -316,7 +316,18 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tmp = os.path.join(DOWNLOAD_DIR, "temp_tonghop.xlsx")
         df_filter.to_excel(tmp, sheet_name="Tổng hợp sản lượng", index=False)
         output_path = os.path.join(DOWNLOAD_DIR, f"TongHop_{now.strftime('%d%m%Y')}.xlsx")
+
+        # Tao file voi ca sheet chi tiet va sheet tong hop
+        import openpyxl as _opx
         tao_bao_cao(tmp, output_path)
+        # Them sheet chi tiet vao dau
+        wb = _opx.load_workbook(output_path)
+        ws_raw = wb.create_sheet("Chi tiết đơn hàng", 0)
+        cols = list(df_filter.columns)
+        ws_raw.append(cols)
+        for _, row in df_filter.iterrows():
+            ws_raw.append([row[c] for c in cols])
+        wb.save(output_path)
 
         with open(output_path, "rb") as f:
             await msg.reply_document(
