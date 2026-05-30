@@ -190,7 +190,7 @@ def doc_file_don_le(filepath, ten_sale=None):
             product = phan_loai_product(level)
 
         dong = {
-            "Ngay dua don": ngay_in_don,
+            "Ngày đưa đơn": ngay_in_don,
             "Code 1": code1,
             "Product": product,
             "Number": number,
@@ -210,12 +210,15 @@ def doc_file_don_le(filepath, ten_sale=None):
 
 
 def them_vao_tong_hop(du_lieu_moi, master_file):
-    cols = ["Ngay dua don", "Code 1", "Product", "Number", "Level",
+    cols = ["Ngày đưa đơn", "Code 1", "Product", "Number", "Level",
             "Qty", "Lenght", "Full Level", "Quality", "Color", "Column1", "INV Date", "Sale"]
 
     if os.path.exists(master_file):
         try:
-            df_cu = pd.read_excel(master_file, sheet_name=0)
+            try:
+                df_cu = pd.read_excel(master_file, sheet_name="Tổng hợp sản lượng")
+            except Exception:
+                df_cu = pd.read_excel(master_file, sheet_name=0)
         except Exception:
             df_cu = pd.DataFrame(columns=cols)
     else:
@@ -225,6 +228,6 @@ def them_vao_tong_hop(du_lieu_moi, master_file):
     df_all = pd.concat([df_cu, df_moi], ignore_index=True)
 
     with pd.ExcelWriter(master_file, engine="openpyxl") as writer:
-        df_all.to_excel(writer, sheet_name="Tong hop san luong", index=False)
+        df_all.to_excel(writer, sheet_name="Tổng hợp sản lượng", index=False)
 
     return len(df_all)

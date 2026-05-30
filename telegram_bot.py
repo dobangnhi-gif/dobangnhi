@@ -153,8 +153,13 @@ async def tao_bao_cao_tuan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if os.path.exists(MASTER_FILE):
         try:
-            df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
-            if "Ngày đưa đơn" in df.columns:
+            try:
+                df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
+            except Exception:
+                df = pd.read_excel(MASTER_FILE, sheet_name=0)
+            if "Ngày đưa đơn" in df.columns or "Ngay dua don" in df.columns:
+                if "Ngay dua don" in df.columns:
+                    df = df.rename(columns={"Ngay dua don": "Ngày đưa đơn"})
                 df["Ngày đưa đơn"] = pd.to_datetime(df["Ngày đưa đơn"], errors="coerce")
                 df_filtered = df[(df["Ngày đưa đơn"] >= tu_ngay) & (df["Ngày đưa đơn"] <= den_ngay)]
                 if not df_filtered.empty:
@@ -271,7 +276,12 @@ async def xem_tonghop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
+        try:
+            df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
+        except Exception:
+            df = pd.read_excel(MASTER_FILE, sheet_name=0)
+        if "Ngay dua don" in df.columns:
+            df = df.rename(columns={"Ngay dua don": "Ngày đưa đơn"})
         df["Ngày đưa đơn"] = pd.to_datetime(df["Ngày đưa đơn"], errors="coerce")
 
         if not args:
