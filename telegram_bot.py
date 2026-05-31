@@ -82,6 +82,9 @@ async def luu_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not os.path.exists(MASTER_FILE):
                 sync_master_from_drive()
             du_lieu, ten_kh = doc_file_don_le(input_path, ten_sale)
+            # Ghi de Ngay dua don = ngay gui file len nhom
+            for d in du_lieu:
+                d["Ngày đưa đơn"] = ngay_gui
             tong = them_vao_tong_hop(du_lieu, MASTER_FILE)
             sync_master_to_drive()
             # Tong hop doanh thu
