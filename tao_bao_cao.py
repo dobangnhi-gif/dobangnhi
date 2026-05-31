@@ -47,15 +47,29 @@ def viet_sheet_product(wb, df):
     for cell in ws[1]:
         style_header(cell)
 
-    # Hệ số quy đổi
-    he_so = {"wigs 200": 3, "wigs 250": 3.5, "wigs 300": 4, "wigs 350": 4.5, "wigs 400": 5}
+    # He so quy doi: wig/set theo trong luong, bundle/lace = so luong
+    he_so = {
+        "wigs 200": 3, "wigs 250": 3.5, "wigs 300": 4, "wigs 350": 4.5, "wigs 400": 5,
+        "200g set": 3, "250g set": 3.5, "300g set": 4, "350g set": 4.5, "400g set": 5,
+    }
+
+    def tinh_thuc_te(loai, so_luong):
+        lv = str(loai).lower().strip()
+        # bundle, lace: thuc te = so luong
+        if lv in ["bundle", "lace"]:
+            return so_luong
+        # Wig/set theo trong luong
+        for key, hs in he_so.items():
+            if key in lv:
+                return so_luong * hs
+        return None
 
     for i, row in enumerate(pivot.itertuples(index=False), start=2):
         ws.cell(i, 1, row[0])
         ws.cell(i, 2, row[1])
-        hs = he_so.get(str(row[0]).lower(), "")
-        if hs:
-            ws.cell(i, 3, row[1] * hs)
+        thuc_te = tinh_thuc_te(row[0], row[1])
+        if thuc_te is not None:
+            ws.cell(i, 3, thuc_te)
         ws.cell(i, 1).font = Font(name="Arial", size=10)
         ws.cell(i, 2).font = Font(name="Arial", size=10)
 
