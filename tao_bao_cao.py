@@ -63,8 +63,10 @@ def viet_sheet_product(wb, df):
     r = len(pivot) + 2
     ws.cell(r, 1, "TỔNG")
     ws.cell(r, 2, f"=SUM(B2:B{r-1})")
+    ws.cell(r, 3, f"=SUM(C2:C{r-1})")
     style_total(ws.cell(r, 1))
     style_total(ws.cell(r, 2))
+    style_total(ws.cell(r, 3))
 
     ws.column_dimensions["A"].width = 15
     ws.column_dimensions["B"].width = 12
