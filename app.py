@@ -66,7 +66,6 @@ HTML = """
   <div class="tab-bar">
     <button class="tab active" onclick="showTab('upload', this)">📤 Gửi đơn</button>
     <button class="tab" onclick="showTab('sanluong', this)">📦 Sản lượng</button>
-    <button class="tab" onclick="showTab('doanhthu', this)">💰 Doanh thu</button>
   </div>
 
   <!-- Tab gửi đơn -->
@@ -101,16 +100,7 @@ HTML = """
     <div class="result" id="sl-result"></div>
   </div>
 
-  <!-- Tab doanh thu -->
-  <div id="tab-doanhthu" class="section">
-    <label class="lbl">Chọn tháng:</label>
-    <div class="row2">
-      <div><label class="lbl">Tháng:</label><input type="text" id="dt-month" placeholder="6" style="text-align:center"></div>
-      <div><label class="lbl">Năm:</label><input type="text" id="dt-year" placeholder="2026" style="text-align:center"></div>
-    </div>
-    <button class="btn green" onclick="getReport('doanhthu')">💰 Tạo báo cáo doanh thu</button>
-    <div class="result" id="dt-result"></div>
-  </div>
+
 </div>
 
 <script>
