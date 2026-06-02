@@ -66,6 +66,7 @@ HTML = """
   <div class="tab-bar">
     <button class="tab active" onclick="showTab('upload', this)">📤 Gửi đơn</button>
     <button class="tab" onclick="showTab('sanluong', this)">📦 Sản lượng</button>
+    <button class="tab" onclick="showTab('xoadon', this)">🗑️ Xóa đơn</button>
   </div>
 
   <!-- Tab gửi đơn -->
@@ -100,6 +101,17 @@ HTML = """
     <div class="result" id="sl-result"></div>
   </div>
 
+
+  <!-- Tab xóa đơn -->
+  <div id="tab-xoadon" class="section">
+    <p style="color:#c62828;font-size:13px;margin-bottom:10px">⚠️ Xóa sẽ xóa toàn bộ dữ liệu của khách khỏi hệ thống. Không thể hoàn tác!</p>
+    <label class="lbl">Tên khách hàng (Code 1 - ví dụ: Vera N7450):</label>
+    <input type="text" id="del-code" placeholder="Nhập tên khách cần xóa">
+    <label class="lbl">Ngày gửi đơn (DD/MM - để trống = xóa tất cả):</label>
+    <input type="text" id="del-date" placeholder="Ví dụ: 02/06 (tùy chọn)">
+    <button class="btn" style="background:#e53935;margin-top:15px" onclick="deleteOrder()">🗑️ Xóa đơn</button>
+    <div class="result" id="del-result"></div>
+  </div>
 
 </div>
 
@@ -178,6 +190,21 @@ async function getReport(type) {
   } catch(e) {
     result.className = 'result error'; result.textContent = '❌ Lỗi kết nối';
   }
+}
+
+async function deleteOrder() {
+  const code = document.getElementById('del-code').value.trim();
+  const date = document.getElementById('del-date').value.trim();
+  const result = document.getElementById('del-result');
+  if (!code) { result.style.display='block'; result.className='result error'; result.textContent='❌ Nhập tên khách cần xóa'; return; }
+  if (!confirm('Xác nhận xóa đơn của: ' + code + '?')) return;
+  result.style.display='block'; result.className='result success'; result.textContent='⏳ Đang xóa...';
+  try {
+    const res = await fetch('/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code: code, date: date}) });
+    const data = await res.json();
+    if (data.success) { result.className='result success'; result.textContent='✅ ' + data.message; }
+    else { result.className='result error'; result.textContent='❌ ' + data.error; }
+  } catch(e) { result.className='result error'; result.textContent='❌ Lỗi kết nối'; }
 }
 </script>
 </body>
@@ -361,6 +388,55 @@ def download(filename):
         return send_file(path, as_attachment=True)
     return "File không tìm thấy", 404
 
+
+
+
+@app.route('/delete', methods=['POST'])
+def delete_order():
+    data = request.get_json()
+    code = (data.get('code') or '').strip()
+    date_str = (data.get('date') or '').strip()
+    if not code:
+        return jsonify({"success": False, "error": "Chưa nhập tên khách"})
+    deleted_sl = 0
+    deleted_dt = 0
+    try:
+        # Xoa trong master san luong
+        if not os.path.exists(MASTER_FILE):
+            gh_download(MASTER_FILENAME, MASTER_FILE)
+        if os.path.exists(MASTER_FILE):
+            try:
+                df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
+            except Exception:
+                df = pd.read_excel(MASTER_FILE, sheet_name=0)
+            mask = df.apply(lambda row: code.lower() in str(row.get("Code 1 ", row.get("Code 1", ""))).lower(), axis=1)
+            if date_str:
+                try:
+                    year = datetime.now().year
+                    d = datetime.strptime(f"{date_str}/{year}", "%d/%m/%Y").date()
+                    df["Ngày đưa đơn"] = pd.to_datetime(df["Ngày đưa đơn"], errors="coerce")
+                    mask = mask & (df["Ngày đưa đơn"].dt.date == d)
+                except Exception:
+                    pass
+            deleted_sl = mask.sum()
+            df_new = df[~mask]
+            with pd.ExcelWriter(MASTER_FILE, engine="openpyxl") as w:
+                df_new.to_excel(w, sheet_name="Tổng hợp sản lượng", index=False)
+            gh_upload(MASTER_FILE, MASTER_FILENAME)
+        # Xoa trong master doanh thu
+        if not os.path.exists(DOANHTHU_FILE):
+            gh_download(DOANHTHU_FILENAME, DOANHTHU_FILE)
+        if os.path.exists(DOANHTHU_FILE):
+            df2 = pd.read_excel(DOANHTHU_FILE, sheet_name="Quản lý")
+            mask2 = df2.apply(lambda row: code.lower() in str(row.get("Tên khách ", row.get("Ten khach", ""))).lower(), axis=1)
+            deleted_dt = mask2.sum()
+            df2_new = df2[~mask2]
+            with pd.ExcelWriter(DOANHTHU_FILE, engine="openpyxl") as w:
+                df2_new.to_excel(w, sheet_name="Quản lý", index=False)
+            gh_upload(DOANHTHU_FILE, DOANHTHU_FILENAME)
+        return jsonify({"success": True, "message": f"Đã xóa {deleted_sl} dòng sản lượng và {deleted_dt} dòng doanh thu của '{code}'"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
