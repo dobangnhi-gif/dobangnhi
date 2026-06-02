@@ -67,6 +67,7 @@ HTML = """
     <button class="tab active" onclick="showTab('upload', this)">📤 Gửi đơn</button>
     <button class="tab" onclick="showTab('sanluong', this)">📦 Sản lượng</button>
     <button class="tab" onclick="showTab('xoadon', this)">🗑️ Xóa đơn</button>
+    <button class="tab" onclick="showTab('doanhthu', this)">💰 Doanh thu</button>
   </div>
 
   <!-- Tab gửi đơn -->
@@ -111,6 +112,18 @@ HTML = """
     <input type="text" id="del-date" placeholder="Ví dụ: 02/06 (tùy chọn)">
     <button class="btn" style="background:#e53935;margin-top:15px" onclick="deleteOrder()">🗑️ Xóa đơn</button>
     <div class="result" id="del-result"></div>
+  </div>
+
+
+  <!-- Tab doanh thu -->
+  <div id="tab-doanhthu" class="section">
+    <label class="lbl">Chọn tháng:</label>
+    <div class="row2">
+      <div><label class="lbl">Tháng:</label><input type="text" id="dt-month" placeholder="6" style="text-align:center"></div>
+      <div><label class="lbl">Năm:</label><input type="text" id="dt-year" placeholder="2026" style="text-align:center"></div>
+    </div>
+    <button class="btn green" onclick="getDoanhthu()">💰 Tạo báo cáo doanh thu</button>
+    <div class="result" id="dt-result"></div>
   </div>
 
 </div>
@@ -212,6 +225,23 @@ async function deleteOrder() {
     const data = await res.json();
     if (data.success) { result.className='result success'; result.textContent='✅ ' + data.message; }
     else { result.className='result error'; result.textContent='❌ ' + data.error; }
+  } catch(e) { result.className='result error'; result.textContent='❌ Lỗi kết nối'; }
+}
+
+async function getDoanhthu() {
+  const month = document.getElementById('dt-month').value || new Date().getMonth()+1;
+  const year = document.getElementById('dt-year').value || new Date().getFullYear();
+  const result = document.getElementById('dt-result');
+  result.style.display='block'; result.className='result success';
+  result.textContent='⏳ Đang tạo báo cáo doanh thu...';
+  try {
+    const res = await fetch('/report?type=doanhthu&month='+month+'&year='+year);
+    const data = await res.json();
+    if (data.success) {
+      result.innerHTML = '✅ ' + data.message + '<br><a class="download-btn" href="'+data.download_url+'" download>⬇️ Tải báo cáo</a>';
+    } else {
+      result.className='result error'; result.textContent='❌ '+data.error;
+    }
   } catch(e) { result.className='result error'; result.textContent='❌ Lỗi kết nối'; }
 }
 </script>
