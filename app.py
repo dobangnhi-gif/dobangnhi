@@ -163,7 +163,11 @@ async function uploadFile() {
   }
   result.innerHTML = '✅ Xong! ' + ok + ' file thành công' + (fail ? ', ' + fail + ' lỗi' : '') +
     (lastUrl ? '<br><small>Báo cáo file cuối:</small><br><a class="download-btn" href="' + lastUrl + '" download>⬇️ Tải báo cáo</a>' : '');
-  btn.disabled = false; btn.textContent = '📤 Gửi đơn';
+  // Reset form
+  document.getElementById('file-input').value = '';
+  document.getElementById('sale-name').value = '';
+  document.getElementById('file-name').textContent = 'Chưa chọn file';
+  btn.disabled = true; btn.textContent = '📤 Gửi đơn';
 }
 
 async function getReport(type) {
