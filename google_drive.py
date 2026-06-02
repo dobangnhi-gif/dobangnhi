@@ -28,13 +28,17 @@ def get_service():
 
 
 def get_or_create_folder(service, folder_name=FOLDER_NAME):
-    """Lay hoac tao thu muc tren Drive."""
+    """Lay folder ID tu env variable truoc, neu khong co thi tim/tao tren Drive."""
+    # Uu tien dung folder ID da cau hinh san
+    folder_id = os.environ.get("DRIVE_FOLDER_ID")
+    if folder_id:
+        return folder_id
+    # Fallback: tim hoac tao
     query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     results = service.files().list(q=query, fields="files(id, name)").execute()
     files = results.get("files", [])
     if files:
         return files[0]["id"]
-    # Tao moi
     meta = {"name": folder_name, "mimeType": "application/vnd.google-apps.folder"}
     folder = service.files().create(body=meta, fields="id").execute()
     return folder["id"]
