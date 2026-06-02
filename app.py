@@ -73,8 +73,8 @@ HTML = """
   <div id="tab-upload" class="section active">
     <div class="upload-area" onclick="document.getElementById('file-input').click()">
       <div class="icon">📎</div>
-      <label>Nhấn để chọn file Excel (.xlsx)</label>
-      <input type="file" id="file-input" accept=".xlsx,.xls" onchange="onFileSelect(this)">
+      <label>Nhấn để chọn file Excel (có thể chọn nhiều)</label>
+      <input type="file" id="file-input" accept=".xlsx,.xls" multiple onchange="onFileSelect(this)">
       <div id="file-name">Chưa chọn file</div>
     </div>
     <label class="lbl">Tên của bạn (Sale):</label>
@@ -129,36 +129,40 @@ function toggleDates(prefix) {
 }
 
 function onFileSelect(input) {
-  const f = input.files[0];
-  document.getElementById('file-name').textContent = f ? f.name : 'Chưa chọn file';
-  document.getElementById('upload-btn').disabled = !f;
+  const files = input.files;
+  if (files.length > 1) {
+    document.getElementById('file-name').textContent = files.length + ' file đã chọn';
+  } else if (files.length === 1) {
+    document.getElementById('file-name').textContent = files[0].name;
+  } else {
+    document.getElementById('file-name').textContent = 'Chưa chọn file';
+  }
+  document.getElementById('upload-btn').disabled = files.length === 0;
 }
 
 async function uploadFile() {
-  const file = document.getElementById('file-input').files[0];
+  const files = document.getElementById('file-input').files;
   const sale = document.getElementById('sale-name').value || 'Không rõ';
   const btn = document.getElementById('upload-btn');
   const result = document.getElementById('upload-result');
-  btn.disabled = true; btn.textContent = '⏳ Đang xử lý...';
-  result.style.display = 'none';
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('sale', sale);
-  try {
-    const res = await fetch('/upload', { method: 'POST', body: formData });
-    const data = await res.json();
-    result.style.display = 'block';
-    if (data.success) {
-      result.className = 'result success';
-      result.innerHTML = '✅ ' + data.message + '<br><a class="download-btn" href="' + data.download_url + '" download>⬇️ Tải báo cáo</a>';
-    } else {
-      result.className = 'result error';
-      result.textContent = '❌ ' + data.error;
-    }
-  } catch(e) {
-    result.style.display = 'block'; result.className = 'result error';
-    result.textContent = '❌ Lỗi kết nối';
+  btn.disabled = true;
+  result.style.display = 'block'; result.className = 'result success';
+  result.textContent = '⏳ Đang xử lý ' + files.length + ' file...';
+  let ok = 0, fail = 0, lastUrl = '';
+  for (let i = 0; i < files.length; i++) {
+    const formData = new FormData();
+    formData.append('file', files[i]);
+    formData.append('sale', sale);
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) { ok++; lastUrl = data.download_url; }
+      else { fail++; }
+    } catch(e) { fail++; }
+    result.textContent = '⏳ Đang xử lý ' + (i+1) + '/' + files.length + ' file...';
   }
+  result.innerHTML = '✅ Xong! ' + ok + ' file thành công' + (fail ? ', ' + fail + ' lỗi' : '') +
+    (lastUrl ? '<br><small>Báo cáo file cuối:</small><br><a class="download-btn" href="' + lastUrl + '" download>⬇️ Tải báo cáo</a>' : '');
   btn.disabled = false; btn.textContent = '📤 Gửi đơn';
 }
 
