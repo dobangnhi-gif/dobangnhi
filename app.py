@@ -111,8 +111,8 @@ HTML = """
       <option value="dedup">✂️ Chỉ xóa dòng bị trùng (giữ 1 bản)</option>
     </select>
     <div id="del-fields">
-      <label class="lbl">Tên khách hàng (ví dụ: Vera N7450):</label>
-      <input type="text" id="del-code" placeholder="Nhập tên khách cần xóa">
+      <label class="lbl">Tên khách hàng (nhiều tên cách nhau bởi dấu phẩy):</label>
+      <input type="text" id="del-code" placeholder="Ví dụ: Vera N7450, Okaa 5235, Mell 0168">
       <label class="lbl">Ngày gửi đơn (DD/MM - để trống = tất cả ngày):</label>
       <input type="text" id="del-date" placeholder="Ví dụ: 02/06 (tùy chọn)">
     </div>
@@ -440,9 +440,13 @@ def download(filename):
 @app.route('/delete', methods=['POST'])
 def delete_order():
     data = request.get_json()
-    code = (data.get('code') or '').strip()
+    code_raw = (data.get('code') or '').strip()
     date_str = (data.get('date') or '').strip()
-    if not code:
+    mode = data.get('mode', 'all')
+    # Ho tro nhieu ten cach nhau boi dau phay
+    codes = [c.strip() for c in code_raw.split(',') if c.strip()]
+    code = code_raw  # giu lai de hien thi
+    if mode == 'all' and not codes:
         return jsonify({"success": False, "error": "Chưa nhập tên khách"})
     deleted_sl = 0
     deleted_dt = 0
