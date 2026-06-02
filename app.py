@@ -105,12 +105,18 @@ HTML = """
 
   <!-- Tab xóa đơn -->
   <div id="tab-xoadon" class="section">
-    <p style="color:#c62828;font-size:13px;margin-bottom:10px">⚠️ Xóa sẽ xóa toàn bộ dữ liệu của khách khỏi hệ thống. Không thể hoàn tác!</p>
-    <label class="lbl">Tên khách hàng (Code 1 - ví dụ: Vera N7450):</label>
-    <input type="text" id="del-code" placeholder="Nhập tên khách cần xóa">
-    <label class="lbl">Ngày gửi đơn (DD/MM - để trống = xóa tất cả):</label>
-    <input type="text" id="del-date" placeholder="Ví dụ: 02/06 (tùy chọn)">
-    <button class="btn" style="background:#e53935;margin-top:15px" onclick="deleteOrder()">🗑️ Xóa đơn</button>
+    <label class="lbl">Chế độ xóa:</label>
+    <select id="del-mode">
+      <option value="all">🗑️ Xóa toàn bộ đơn của khách</option>
+      <option value="dedup">✂️ Chỉ xóa dòng bị trùng (giữ 1 bản)</option>
+    </select>
+    <div id="del-fields">
+      <label class="lbl">Tên khách hàng (ví dụ: Vera N7450):</label>
+      <input type="text" id="del-code" placeholder="Nhập tên khách cần xóa">
+      <label class="lbl">Ngày gửi đơn (DD/MM - để trống = tất cả ngày):</label>
+      <input type="text" id="del-date" placeholder="Ví dụ: 02/06 (tùy chọn)">
+    </div>
+    <button class="btn" style="background:#e53935;margin-top:15px" onclick="deleteOrder()">🗑️ Xóa</button>
     <div class="result" id="del-result"></div>
   </div>
 
@@ -214,14 +220,16 @@ async function getReport(type) {
 }
 
 async function deleteOrder() {
+  const mode = document.getElementById('del-mode').value;
   const code = document.getElementById('del-code').value.trim();
   const date = document.getElementById('del-date').value.trim();
   const result = document.getElementById('del-result');
-  if (!code) { result.style.display='block'; result.className='result error'; result.textContent='❌ Nhập tên khách cần xóa'; return; }
-  if (!confirm('Xác nhận xóa đơn của: ' + code + '?')) return;
-  result.style.display='block'; result.className='result success'; result.textContent='⏳ Đang xóa...';
+  if (mode === 'all' && !code) { result.style.display='block'; result.className='result error'; result.textContent='❌ Nhập tên khách cần xóa'; return; }
+  const msg = mode === 'dedup' ? 'Xác nhận xóa dòng trùng' + (code ? ' của: '+code : ' toàn bộ') + '?' : 'Xác nhận xóa toàn bộ đơn của: ' + code + '?';
+  if (!confirm(msg)) return;
+  result.style.display='block'; result.className='result success'; result.textContent='⏳ Đang xử lý...';
   try {
-    const res = await fetch('/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code: code, date: date}) });
+    const res = await fetch('/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code: code, date: date, mode: mode}) });
     const data = await res.json();
     if (data.success) { result.className='result success'; result.textContent='✅ ' + data.message; }
     else { result.className='result error'; result.textContent='❌ ' + data.error; }
