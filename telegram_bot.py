@@ -44,9 +44,11 @@ def sync_master_to_drive():
     try:
         if os.path.exists(MASTER_FILE):
             upload_file(MASTER_FILE, MASTER_FILENAME)
-            logging.info("Synced master file to Drive")
+            logging.info("Synced master file to Drive OK")
+            print(f"DRIVE UPLOAD OK: {MASTER_FILENAME}", flush=True)
     except Exception as e:
-        logging.warning(f"Khong the upload master file len Drive: {e}")
+        logging.error(f"DRIVE UPLOAD ERROR: {e}")
+        print(f"DRIVE UPLOAD ERROR: {e}", flush=True)
 
 
 def la_file_don_le(filename):
