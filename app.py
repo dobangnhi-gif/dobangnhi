@@ -441,15 +441,18 @@ def delete_order():
     code_raw = (data.get('code') or '').strip()
     date_str = (data.get('date') or '').strip()
     mode = data.get('mode', 'all')
-    # Ho tro nhieu ten cach nhau boi dau phay
     codes = [c.strip() for c in code_raw.split(',') if c.strip()]
-    code = code_raw  # giu lai de hien thi
     if mode == 'all' and not codes:
         return jsonify({"success": False, "error": "Chưa nhập tên khách"})
     deleted_sl = 0
     deleted_dt = 0
+
+    def match_codes(val):
+        v = str(val).lower().replace(" ", "")
+        return any(c.lower().replace(" ", "") in v for c in codes) if codes else True
+
     try:
-        # Xoa trong master san luong
+        # Xu ly master san luong
         if not os.path.exists(MASTER_FILE):
             gh_download(MASTER_FILENAME, MASTER_FILE)
         if os.path.exists(MASTER_FILE):
@@ -457,32 +460,77 @@ def delete_order():
                 df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
             except Exception:
                 df = pd.read_excel(MASTER_FILE, sheet_name=0)
-            mask = df.apply(lambda row: code.lower().replace(" ","") in str(row.get("Code 1 ", row.get("Code 1", ""))).lower().replace(" ",""), axis=1)
-            if date_str:
-                try:
-                    year = datetime.now().year
-                    d = datetime.strptime(f"{date_str}/{year}", "%d/%m/%Y").date()
-                    df["Ngày đưa đơn"] = pd.to_datetime(df["Ngày đưa đơn"], errors="coerce")
-                    mask = mask & (df["Ngày đưa đơn"].dt.date == d)
-                except Exception:
-                    pass
-            deleted_sl = mask.sum()
-            df_new = df[~mask]
+
+            if mode == 'dedup':
+                # Xoa trung: chi dua vao cot Code 2
+                subset_sl = [c for c in ["Code 2"] if c in df.columns]
+                if subset_sl:
+                    if codes:
+                        mask_code = df.apply(lambda r: match_codes(r.get("Code 1 ", r.get("Code 1", ""))), axis=1)
+                        df_keep = df[~mask_code]
+                        df_target = df[mask_code].copy()
+                        before = len(df_target)
+                        df_target = df_target.drop_duplicates(subset=subset_sl, keep='first')
+                        deleted_sl = before - len(df_target)
+                        df = pd.concat([df_keep, df_target], ignore_index=True)
+                    else:
+                        before = len(df)
+                        df = df.drop_duplicates(subset=subset_sl, keep='first')
+                        deleted_sl = before - len(df)
+            else:
+                # Xoa toan bo
+                mask = df.apply(lambda r: match_codes(r.get("Code 1 ", r.get("Code 1", ""))), axis=1)
+                if date_str:
+                    try:
+                        d = datetime.strptime(f"{date_str}/{datetime.now().year}", "%d/%m/%Y").date()
+                        df["Ngày đưa đơn"] = pd.to_datetime(df["Ngày đưa đơn"], errors="coerce")
+                        mask = mask & (df["Ngày đưa đơn"].dt.date == d)
+                    except Exception:
+                        pass
+                deleted_sl = int(mask.sum())
+                df = df[~mask]
+
             with pd.ExcelWriter(MASTER_FILE, engine="openpyxl") as w:
-                df_new.to_excel(w, sheet_name="Tổng hợp sản lượng", index=False)
+                df.to_excel(w, sheet_name="Tổng hợp sản lượng", index=False)
             gh_upload(MASTER_FILE, MASTER_FILENAME)
-        # Xoa trong master doanh thu
+
+        # Xu ly master doanh thu
         if not os.path.exists(DOANHTHU_FILE):
             gh_download(DOANHTHU_FILENAME, DOANHTHU_FILE)
         if os.path.exists(DOANHTHU_FILE):
             df2 = pd.read_excel(DOANHTHU_FILE, sheet_name="Quản lý")
-            mask2 = df2.apply(lambda row: code.lower().replace(" ","") in str(row.get("Tên khách ", row.get("Ten khach", ""))).lower().replace(" ",""), axis=1)
-            deleted_dt = mask2.sum()
-            df2_new = df2[~mask2]
+
+            def match_kh(val):
+                v = str(val).lower().replace(" ", "")
+                return any(c.lower().replace(" ", "") in v for c in codes) if codes else True
+
+            if mode == 'dedup':
+                # Xoa trung: dua vao Ten khach + Amount
+                subset_dt = [c for c in ["Tên khách ", "Amount"] if c in df2.columns]
+                if subset_dt:
+                    if codes:
+                        mask2 = df2.apply(lambda r: match_kh(r.get("Tên khách ", r.get("Ten khach", ""))), axis=1)
+                        df2_keep = df2[~mask2]
+                        df2_target = df2[mask2].copy()
+                        before2 = len(df2_target)
+                        df2_target = df2_target.drop_duplicates(subset=subset_dt, keep='first')
+                        deleted_dt = before2 - len(df2_target)
+                        df2 = pd.concat([df2_keep, df2_target], ignore_index=True)
+                    else:
+                        before2 = len(df2)
+                        df2 = df2.drop_duplicates(subset=subset_dt, keep='first')
+                        deleted_dt = before2 - len(df2)
+            else:
+                mask2 = df2.apply(lambda r: match_kh(r.get("Tên khách ", r.get("Ten khach", ""))), axis=1)
+                deleted_dt = int(mask2.sum())
+                df2 = df2[~mask2]
+
             with pd.ExcelWriter(DOANHTHU_FILE, engine="openpyxl") as w:
-                df2_new.to_excel(w, sheet_name="Quản lý", index=False)
+                df2.to_excel(w, sheet_name="Quản lý", index=False)
             gh_upload(DOANHTHU_FILE, DOANHTHU_FILENAME)
-        return jsonify({"success": True, "message": f"Đã xóa {deleted_sl} dòng sản lượng và {deleted_dt} dòng doanh thu của '{code}'"})
+
+        action = "xóa trùng" if mode == 'dedup' else "xóa"
+        return jsonify({"success": True, "message": f"Đã {action}: {deleted_sl} dòng sản lượng, {deleted_dt} dòng doanh thu"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 

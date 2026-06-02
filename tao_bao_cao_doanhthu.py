@@ -53,6 +53,14 @@ def doc_file_don_le_doanhthu(filepath, ten_sale=None):
 
     header_idx = tim_header_row(rows) or 3
 
+    # Doc ten sale tu file (o ben phai chu "Sale")
+    for _row in rows[:4]:
+        for _j, _v in enumerate(_row):
+            if _v and str(_v).lower().strip() == 'sale':
+                if _j + 1 < len(_row) and _row[_j + 1]:
+                    ten_sale = str(_row[_j + 1]).strip()
+                break
+
     # Tim ten khach dung ham chung
     ten_kh = tim_ten_khach(rows, header_idx)
 
