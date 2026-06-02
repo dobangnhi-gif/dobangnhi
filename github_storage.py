@@ -5,6 +5,7 @@ import os
 import base64
 import logging
 import requests
+from urllib.parse import quote
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPO = "dobangnhi-gif/dobangnhi"
@@ -26,7 +27,7 @@ def upload_file(local_path, filename=None):
         return False
     if filename is None:
         filename = os.path.basename(local_path)
-    url = f"{API_BASE}/{filename}"
+    url = f"{API_BASE}/{quote(filename)}"
     with open(local_path, "rb") as f:
         content = base64.b64encode(f.read()).decode()
     # Lay SHA neu file da ton tai
@@ -54,7 +55,7 @@ def download_file(filename, local_path):
     """Download file tu GitHub ve local. Tra ve True neu thanh cong."""
     if not GITHUB_TOKEN:
         return False
-    url = f"{API_BASE}/{filename}"
+    url = f"{API_BASE}/{quote(filename)}"
     r = requests.get(url, headers=_headers())
     if r.status_code != 200:
         return False
