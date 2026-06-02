@@ -10,8 +10,8 @@ from doc_file_don_le import doc_file_don_le, them_vao_tong_hop
 import pandas as pd
 
 try:
-    from google_drive import upload_file, download_file, list_files_on_drive
-    USE_DRIVE = bool(os.environ.get("GOOGLE_CREDENTIALS"))
+    from github_storage import upload_file, download_file
+    USE_DRIVE = bool(os.environ.get("GITHUB_TOKEN"))
 except Exception:
     USE_DRIVE = False
 
