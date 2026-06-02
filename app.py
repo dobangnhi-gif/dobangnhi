@@ -417,7 +417,7 @@ def delete_order():
                 df = pd.read_excel(MASTER_FILE, sheet_name="Tổng hợp sản lượng")
             except Exception:
                 df = pd.read_excel(MASTER_FILE, sheet_name=0)
-            mask = df.apply(lambda row: code.lower() in str(row.get("Code 1 ", row.get("Code 1", ""))).lower(), axis=1)
+            mask = df.apply(lambda row: code.lower().replace(" ","") in str(row.get("Code 1 ", row.get("Code 1", ""))).lower().replace(" ",""), axis=1)
             if date_str:
                 try:
                     year = datetime.now().year
@@ -436,7 +436,7 @@ def delete_order():
             gh_download(DOANHTHU_FILENAME, DOANHTHU_FILE)
         if os.path.exists(DOANHTHU_FILE):
             df2 = pd.read_excel(DOANHTHU_FILE, sheet_name="Quản lý")
-            mask2 = df2.apply(lambda row: code.lower() in str(row.get("Tên khách ", row.get("Ten khach", ""))).lower(), axis=1)
+            mask2 = df2.apply(lambda row: code.lower().replace(" ","") in str(row.get("Tên khách ", row.get("Ten khach", ""))).lower().replace(" ",""), axis=1)
             deleted_dt = mask2.sum()
             df2_new = df2[~mask2]
             with pd.ExcelWriter(DOANHTHU_FILE, engine="openpyxl") as w:
