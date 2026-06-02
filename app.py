@@ -78,8 +78,6 @@ HTML = """
       <input type="file" id="file-input" accept=".xlsx,.xls" multiple onchange="onFileSelect(this)">
       <div id="file-name">Chưa chọn file</div>
     </div>
-    <label class="lbl">Tên của bạn (Sale):</label>
-    <input type="text" id="sale-name" placeholder="Ví dụ: A Thắng">
     <button class="btn" id="upload-btn" onclick="uploadFile()" disabled>📤 Gửi đơn</button>
     <div class="result" id="upload-result"></div>
   </div>
@@ -161,7 +159,7 @@ function onFileSelect(input) {
 
 async function uploadFile() {
   const files = document.getElementById('file-input').files;
-  const sale = document.getElementById('sale-name').value || 'Không rõ';
+  const sale = '';
   const btn = document.getElementById('upload-btn');
   const result = document.getElementById('upload-result');
   btn.disabled = true;
@@ -184,7 +182,7 @@ async function uploadFile() {
     (lastUrl ? '<br><small>Báo cáo file cuối:</small><br><a class="download-btn" href="' + lastUrl + '" download>⬇️ Tải báo cáo</a>' : '');
   // Reset form
   document.getElementById('file-input').value = '';
-  document.getElementById('sale-name').value = '';
+
   document.getElementById('file-name').textContent = 'Chưa chọn file';
   btn.disabled = true; btn.textContent = '📤 Gửi đơn';
 }

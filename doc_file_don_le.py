@@ -60,7 +60,7 @@ def tim_ten_khach(rows, header_idx):
     # Cach 2: Tim gia tri khong phai keyword
     skip_kw = ["inv", "start", "amount", "date", "number", "type", "level",
                "qty", "length", "quality", "color", "pattern", "mau",
-               "closure", "full", "gia", "don", "ngay", "customer"]
+               "closure", "full", "gia", "don", "ngay", "customer", "sale"]
 
     def normalize(s):
         viet = {"d": "d", "a": "a", "e": "e", "o": "o", "u": "u", "i": "i"}
@@ -102,6 +102,17 @@ def tim_ngay(rows, header_idx):
     return ngay_in, inv_date
 
 
+def tim_ten_sale(rows):
+    """Doc ten sale tu file - o ben phai chu 'sale'."""
+    for row in rows[:4]:
+        for j, v in enumerate(row):
+            if v and str(v).lower().strip() == 'sale':
+                # Lay gia tri ben phai
+                if j + 1 < len(row) and rows[rows.index(row)][j+1]:
+                    return str(rows[rows.index(row)][j+1]).strip()
+    return None
+
+
 def doc_file_don_le(filepath, ten_sale=None):
     wb = openpyxl.load_workbook(filepath, data_only=True)
     ws = wb.active
@@ -117,6 +128,11 @@ def doc_file_don_le(filepath, ten_sale=None):
 
     ten_kh = tim_ten_khach(rows, header_idx)
     ngay_in_don, inv_date = tim_ngay(rows, header_idx)
+
+    # Doc ten sale tu file (uu tien) hoac dung ten_sale truyen vao
+    sale_from_file = tim_ten_sale(rows)
+    if sale_from_file:
+        ten_sale = sale_from_file
 
     # Tao Code 1: DDMM + ten khach (bo khoang trang)
     if ngay_in_don and ten_kh:
