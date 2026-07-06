@@ -1,6 +1,7 @@
 flask
 openpyxl
 pandas
+pdfplumber
 google-auth
 google-api-python-client
 requests

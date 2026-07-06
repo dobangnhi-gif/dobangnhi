@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(__file__))
 from doc_file_don_le import doc_file_don_le, them_vao_tong_hop
+from doc_file_pdf import doc_file_don_le_pdf, doc_file_don_le_doanhthu_pdf, la_file_pdf
 from tao_bao_cao import tao_bao_cao
 from tao_bao_cao_doanhthu import doc_file_don_le_doanhthu, them_vao_doanh_thu, viet_sheet_quan_ly, viet_sheet_cong_no, viet_sheet_dthu
 from github_storage import upload_file as gh_upload, download_file as gh_download
@@ -74,8 +75,8 @@ HTML = """
   <div id="tab-upload" class="section active">
     <div class="upload-area" onclick="document.getElementById('file-input').click()">
       <div class="icon">📎</div>
-      <label>Nhấn để chọn file Excel (có thể chọn nhiều)</label>
-      <input type="file" id="file-input" accept=".xlsx,.xls" multiple onchange="onFileSelect(this)">
+      <label>Nhấn để chọn file Excel hoặc PDF (có thể chọn nhiều)</label>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.pdf" multiple onchange="onFileSelect(this)">
       <div id="file-name">Chưa chọn file</div>
     </div>
     <button class="btn" id="upload-btn" onclick="uploadFile()" disabled>📤 Gửi đơn</button>
@@ -267,15 +268,19 @@ def upload():
         return jsonify({"success": False, "error": "Không có file"})
     f = request.files['file']
     sale = request.form.get('sale', 'Không rõ')
-    if not f.filename.endswith(('.xlsx', '.xls')):
-        return jsonify({"success": False, "error": "Chỉ chấp nhận file Excel (.xlsx)"})
+    if not f.filename.lower().endswith(('.xlsx', '.xls', '.pdf')):
+        return jsonify({"success": False, "error": "Chỉ chấp nhận file Excel (.xlsx) hoặc PDF (.pdf)"})
+    is_pdf = la_file_pdf(f.filename)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     save_path = os.path.join(UPLOAD_DIR, f"{ts}_{f.filename}")
     f.save(save_path)
     try:
         if not os.path.exists(MASTER_FILE):
             gh_download(MASTER_FILENAME, MASTER_FILE)
-        du_lieu, ten_kh = doc_file_don_le(save_path, sale)
+        if is_pdf:
+            du_lieu, ten_kh = doc_file_don_le_pdf(save_path, sale)
+        else:
+            du_lieu, ten_kh = doc_file_don_le(save_path, sale)
         ngay_gui = datetime.now()
         for d in du_lieu:
             d["Ngày đưa đơn"] = ngay_gui
@@ -286,7 +291,10 @@ def upload():
         try:
             if not os.path.exists(DOANHTHU_FILE):
                 gh_download(DOANHTHU_FILENAME, DOANHTHU_FILE)
-            dong_dt = doc_file_don_le_doanhthu(save_path, sale)
+            if is_pdf:
+                dong_dt = doc_file_don_le_doanhthu_pdf(save_path, sale)
+            else:
+                dong_dt = doc_file_don_le_doanhthu(save_path, sale)
             dong_dt["Ngày gửi đơn"] = ngay_gui
             them_vao_doanh_thu(dong_dt, DOANHTHU_FILE)
             gh_upload(DOANHTHU_FILE, DOANHTHU_FILENAME)
@@ -294,10 +302,11 @@ def upload():
             pass  # Doanh thu khong bat buoc
 
         # Tao bao cao cho file nay
-        tmp = save_path + "_tmp.xlsx"
+        base_path = os.path.splitext(save_path)[0]
+        tmp = base_path + "_tmp.xlsx"
         df = pd.DataFrame(du_lieu)
         df.to_excel(tmp, sheet_name="Tổng hợp sản lượng", index=False)
-        out = save_path.replace(".xlsx", "_baocao.xlsx")
+        out = base_path + "_baocao.xlsx"
         tao_bao_cao(tmp, out)
         wb = openpyxl.load_workbook(out)
         ws_raw = wb.create_sheet("Chi tiet", 0)
