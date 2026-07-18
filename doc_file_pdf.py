@@ -33,6 +33,44 @@ def _clean_cell(s):
     return re.sub(r"\s+", " ", " ".join(keep)).strip()
 
 
+def _so_thu_tu(first_cell):
+    """Lay so thu tu cua dong hang, GIU NGUYEN duoi chu.
+
+    Xu ly linh hoat (chiu duoc nhieu watermark), tra ve:
+      - '1A', '1B', '2C' (chuoi) khi co duoi chu   -> GIU nguyen A/B, KHONG
+        gop thanh 1
+      - 3 (so nguyen) khi la so tron, khong co duoi -> giu nguyen kieu cu
+      - None khi o dau khong phai so thu tu (hang tieu de, o 'label: value')
+    """
+    f = _clean_cell(first_cell)
+    if not f or ":" in f:
+        return None
+    # Bo chu cai watermark dung rieng le con dinh trong o
+    f = re.sub(r"(?<![0-9A-Za-z])[CATHIRFOY](?![0-9A-Za-z])", "", f).strip()
+    # Bo chu cai watermark dinh SAT TRUOC so: 'R3' -> '3' (prefix chac chan
+    # khong phai so thu tu). Con duoi chu SAU so ('1A','1B') thi GIU nguyen -
+    # do la danh so phu that su, khong gop thanh 1.
+    f = re.sub(r"^[CATHIRFOY]+(?=\d)", "", f)
+    m = re.match(r"^(\d{1,3})([A-Za-z]?)$", f)
+    if not m:
+        return None
+    num = int(m.group(1))
+    suffix = m.group(2).upper()
+    return f"{num}{suffix}" if suffix else num
+
+
+def _la_dong_hang(first_cell):
+    """Nhan dien dong hang chi tiet mot cach LINH HOAT.
+
+    Truoc day app yeu cau o dau la SO TRON tuyet doi (re.fullmatch d+),
+    nen bi vo khi:
+      - Don danh so phu kieu '1A', '1B', '2A' (nhu file khach Nelly)
+      - pdfplumber (tuy phien ban) lam dinh 1 chu cai watermark vao o so,
+        vd '3R', 'R3', '3\\nH' ...
+    """
+    return _so_thu_tu(first_cell) is not None
+
+
 def _norm_type(v):
     """bundle / closure / gift (chiu duoc nhieu ky tu watermark)."""
     s = _clean_cell(v).lower()
@@ -147,13 +185,15 @@ def _doc_header_va_rows(filepath):
     line_items = []
     header_cells = []  # cac o o trang 1 (chua phai dong hang)
 
+    full_text_parts = []
     with pdfplumber.open(filepath) as pdf:
         for pidx, page in enumerate(pdf.pages):
+            full_text_parts.append(page.extract_text() or "")
             for table in page.extract_tables():
                 for raw in table:
                     cells = [_clean_cell(c) for c in raw]
-                    # Dong hang chi tiet: o dau tien la so thu tu
-                    if cells and re.fullmatch(r"\d+", cells[0] or ""):
+                    # Dong hang chi tiet: o dau la so thu tu (nhan dien linh hoat)
+                    if cells and _la_dong_hang(raw[0]):
                         line_items.append(cells)
                     elif pidx == 0:
                         header_cells.extend([c for c in cells if c])
@@ -179,6 +219,38 @@ def _doc_header_va_rows(filepath):
             header["note"] = val
         elif label.startswith("s") and val and re.search(r"[A-Za-z]{2,}\d", val):
             header["so_don"] = header["so_don"] or val     # So don
+
+    # --- Fallback: doc header tu TOAN VAN neu bang khong lay du ---
+    # (chong truong hop watermark lam vo o header trong bang)
+    full_text = "\n".join(full_text_parts)
+    ft = re.sub(r"(?m)^\s*[CATHIRFOY]\s*$", "", full_text)  # bo dong watermark 1 chu
+
+    def _tim(pattern):
+        m = re.search(pattern, ft, re.IGNORECASE)
+        return m.group(1).strip() if m else None
+
+    # Chu y: fallback deu YEU CAU dau ':' de tranh bat nham
+    # (vd 'SALES INVOICE' khong bi hieu la 'Sale: S INVOICE')
+    if not header["amount"]:
+        v = _tim(r"AMOUNT\s*:\s*([\d.,]+)")
+        if v:
+            num = re.sub(r"[^\d]", "", v)
+            if num:
+                header["amount"] = float(num)
+    if not header["khach"]:
+        header["khach"] = _tim(r"Kh[aá]ch\s*:\s*([^\n|]+?)\s*(?:\||Sale|$)")
+    if not header["sale"]:
+        header["sale"] = _tim(r"\bSale\s*:\s*([^\n|]+)")
+    if not header["so_don"]:
+        header["so_don"] = _tim(r"(INV[\d\-]+)")
+    if not header["ngay_in_don"]:
+        v = _tim(r"Ng[aà]y in [đd][oơ]n\s*:\s*([\d\-./]+)")
+        if v:
+            header["ngay_in_don"] = _parse_ngay(v)
+    if not header["inv_date"]:
+        v = _tim(r"INV\s*DATE\s*:\s*([\d\-./]+)")
+        if v:
+            header["inv_date"] = _parse_ngay(v)
 
     return header, line_items
 
@@ -217,7 +289,7 @@ def doc_file_don_le_pdf(filepath, ten_sale=None):
         def col(i):
             return c[i] if i < len(c) else ""
 
-        number = _norm_int(col(0))
+        number = _so_thu_tu(col(0))   # giu nguyen duoi chu: '1A','1B' hoac int
         if number is None:
             continue
         type_val = _norm_type(col(1))
