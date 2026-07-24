@@ -301,7 +301,15 @@ def doc_file_don_le_pdf(filepath, ten_sale=None):
         color = _norm_color(col(7))
         pattern = _norm_pattern(col(8))
 
-        product = phan_loai_product(type_val)
+        # Phan loai Product theo CA cot "Type" LAN cot "Lace".
+        # Nhieu INV de cot "Type" TRONG voi hang wig, thong tin "300g wigs"
+        # lai nam o cot "Lace" (vd "5x5 300g wigs"). Neu chi doc cot Type se sai:
+        #   - Type trong han   -> phan_loai_product('') tra ve 'bundle'
+        #   - manh '5x5' lot vao Type -> khong khop 300g/wig -> roi vao 'lace'
+        # KHONG dung cot "Full level" vi no chua "wig 10" (= so hieu wig set),
+        # se lam hang bundle/lace bi nhan nham thanh wig.
+        type_lace = (_clean_cell(col(1)) + " " + _clean_cell(col(2))).strip()
+        product = phan_loai_product(type_lace)
         loai_mau = "No Color" if "natural" in (color or "").lower() else "Color"
         code2 = (str(code1) + str(number)) if code1 else str(number)
 
